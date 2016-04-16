@@ -10,7 +10,7 @@
  * 输入参数：无
  * 返 回 值：无
  ******************************************************************************/
-void RFID_init()
+void MFRC522_init()
 {
  
   //SPI
@@ -30,7 +30,7 @@ void RFID_init()
   writeMFRC522(TxAutoReg, 0x40);    //100%ASK
   writeMFRC522(ModeReg, 0x3D);    // CRC valor inicial de 0x6363
  
-  antennaOn();    //打开天线
+  RFID_antennaOn();    //打开天线
 }
  
 /******************************************************************************
@@ -104,7 +104,7 @@ void RFID_antennaOn(void)
   temp = readMFRC522(TxControlReg);
   if (!(temp & 0x03))
   {
-    setBitMask(TxControlReg, 0x03);
+    RFID_setBitMask(TxControlReg, 0x03);
   }
 }
  
@@ -121,7 +121,7 @@ void RFID_antennaOff(void)
   temp = readMFRC522(TxControlReg);
   if (!(temp & 0x03))
   {
-    clearBitMask(TxControlReg, 0x03);
+    RFID_clearBitMask(TxControlReg, 0x03);
   }
 }
  
@@ -135,8 +135,8 @@ void RFID_calculateCRC(unsigned char *pIndata, unsigned char len, unsigned char 
 {
   unsigned char i, n;
  
-  clearBitMask(DivIrqReg, 0x04);      //CRCIrq = 0
-  setBitMask(FIFOLevelReg, 0x80);     //清FIFO指针
+  RFID_clearBitMask(DivIrqReg, 0x04);      //CRCIrq = 0
+  RFID_setBitMask(FIFOLevelReg, 0x80);     //清FIFO指针
   //Write_MFRC522(CommandReg, PCD_IDLE);
  
   //向FIFO中写入数据
@@ -196,8 +196,8 @@ unsigned char RFID_MFRC522ToCard(unsigned char command, unsigned char *sendData,
   }
  
   writeMFRC522(CommIEnReg, irqEn|0x80); //允许中断请求
-  clearBitMask(CommIrqReg, 0x80);       //清除所有中断请求位
-  setBitMask(FIFOLevelReg, 0x80);       //FlushBuffer=1, FIFO初始化
+  RFID_clearBitMask(CommIrqReg, 0x80);       //清除所有中断请求位
+  RFID_setBitMask(FIFOLevelReg, 0x80);       //FlushBuffer=1, FIFO初始化
  
   writeMFRC522(CommandReg, PCD_IDLE);   //无动作，取消当前命令
  
@@ -208,7 +208,7 @@ unsigned char RFID_MFRC522ToCard(unsigned char command, unsigned char *sendData,
   //执行命令
   writeMFRC522(CommandReg, command);
   if (command == PCD_TRANSCEIVE)
-    setBitMask(BitFramingReg, 0x80);    //StartSend=1,transmission of data starts
+    RFID_setBitMask(BitFramingReg, 0x80);    //StartSend=1,transmission of data starts
  
   //等待接收数据完成
   i = 2000; //i根据时钟频率调整，操作M1卡最大等待时间25ms
@@ -221,7 +221,7 @@ unsigned char RFID_MFRC522ToCard(unsigned char command, unsigned char *sendData,
   }
   while ((i!=0) && !(n&0x01) && !(n&waitIRq));
  
-  clearBitMask(BitFramingReg, 0x80);      //StartSend=0
+  RFID_clearBitMask(BitFramingReg, 0x80);      //StartSend=0
  
   if (i != 0)
   {
@@ -281,7 +281,7 @@ unsigned char RFID_findCard(unsigned char reqMode, unsigned char *TagType)
   writeMFRC522(BitFramingReg, 0x07);    //TxLastBists = BitFramingReg[2..0] ???
  
   TagType[0] = reqMode;
-  status = MFRC522ToCard(PCD_TRANSCEIVE, TagType, 1, TagType, &backBits);
+  status = RFID_MFRC522ToCard(PCD_TRANSCEIVE, TagType, 1, TagType, &backBits);
  
   if ((status != MI_OK) || (backBits != 0x10))
     status = MI_ERR;
@@ -302,14 +302,14 @@ unsigned char RFID_anticoll(unsigned char *serNum)
   unsigned char serNumCheck=0;
   unsigned int unLen;
  
-  clearBitMask(Status2Reg, 0x08);   //TempSensclear
-  clearBitMask(CollReg,0x80);     //ValuesAfterColl
+  RFID_clearBitMask(Status2Reg, 0x08);   //TempSensclear
+  RFID_clearBitMask(CollReg,0x80);     //ValuesAfterColl
   writeMFRC522(BitFramingReg, 0x00);    //TxLastBists = BitFramingReg[2..0]
  
   serNum[0] = PICC_ANTICOLL;
   serNum[1] = 0x20;
  
-  status = MFRC522ToCard(PCD_TRANSCEIVE, serNum, 2, serNum, &unLen);
+  status = RFID_MFRC522ToCard(PCD_TRANSCEIVE, serNum, 2, serNum, &unLen);
  
   if (status == MI_OK)
   {
@@ -323,7 +323,7 @@ unsigned char RFID_anticoll(unsigned char *serNum)
     }
   }
  
-  setBitMask(CollReg, 0x80);    //ValuesAfterColl=1
+  RFID_setBitMask(CollReg, 0x80);    //ValuesAfterColl=1
  
   return status;
 }
@@ -354,7 +354,7 @@ unsigned char RFID_auth(unsigned char authMode, unsigned char BlockAddr, unsigne
   for (i=0; i<4; i++)
     buff[i+8] = *(serNum+i);
      
-  status = MFRC522ToCard(PCD_AUTHENT, buff, 12, buff, &recvBits);
+  status = RFID_MFRC522ToCard(PCD_AUTHENT, buff, 12, buff, &recvBits);
   if ((status != MI_OK) || (!(readMFRC522(Status2Reg) & 0x08)))
     status = MI_ERR;
  
@@ -374,8 +374,8 @@ unsigned char RFID_read(unsigned char blockAddr, unsigned char *recvData)
  
   recvData[0] = PICC_READ;
   recvData[1] = blockAddr;
-  calculateCRC(recvData,2, &recvData[2]);
-  status = MFRC522ToCard(PCD_TRANSCEIVE, recvData, 4, recvData, &unLen);
+  RFID_calculateCRC(recvData,2, &recvData[2]);
+  status = RFID_MFRC522ToCard(PCD_TRANSCEIVE, recvData, 4, recvData, &unLen);
  
   if ((status != MI_OK) || (unLen != 0x90))
     status = MI_ERR;
@@ -398,8 +398,8 @@ unsigned char RFID_write(unsigned char blockAddr, unsigned char *writeData)
  
   buff[0] = PICC_WRITE;
   buff[1] = blockAddr;
-  calculateCRC(buff, 2, &buff[2]);
-  status = MFRC522ToCard(PCD_TRANSCEIVE, buff, 4, buff, &recvBits);
+  RFID_calculateCRC(buff, 2, &buff[2]);
+  status = RFID_MFRC522ToCard(PCD_TRANSCEIVE, buff, 4, buff, &recvBits);
  
   if ((status != MI_OK) || (recvBits != 4) || ((buff[0] & 0x0F) != 0x0A))
     status = MI_ERR;
@@ -409,8 +409,8 @@ unsigned char RFID_write(unsigned char blockAddr, unsigned char *writeData)
     for (i=0; i<16; i++)    //?FIFO?16Byte?? Datos a la FIFO 16Byte escribir
       buff[i] = *(writeData+i);
        
-    calculateCRC(buff, 16, &buff[16]);
-    status = MFRC522ToCard(PCD_TRANSCEIVE, buff, 18, buff, &recvBits);
+    RFID_calculateCRC(buff, 16, &buff[16]);
+    status = RFID_MFRC522ToCard(PCD_TRANSCEIVE, buff, 18, buff, &recvBits);
  
     if ((status != MI_OK) || (recvBits != 4) || ((buff[0] & 0x0F) != 0x0A))
       status = MI_ERR;
@@ -442,9 +442,9 @@ unsigned char RFID_selectTag(unsigned char *serNum)
   for (i=0; i<5; i++)
     buffer[i+2] = *(serNum+i);
  
-  calculateCRC(buffer, 7, &buffer[7]);
+  RFID_calculateCRC(buffer, 7, &buffer[7]);
    
-  status = MFRC522ToCard(PCD_TRANSCEIVE, buffer, 9, buffer, &recvBits);
+  status = RFID_MFRC522ToCard(PCD_TRANSCEIVE, buffer, 9, buffer, &recvBits);
   if ((status == MI_OK) && (recvBits == 0x18))
     size = buffer[i];
   else
@@ -466,7 +466,7 @@ void RFID_halt()
  
   buff[0] = PICC_HALT;
   buff[1] = 0;
-  calculateCRC(buff, 2, &buff[2]);
+  RFID_calculateCRC(buff, 2, &buff[2]);
  
-  status = MFRC522ToCard(PCD_TRANSCEIVE, buff, 4, buff,&unLen);
+  status = RFID_MFRC522ToCard(PCD_TRANSCEIVE, buff, 4, buff,&unLen);
 }
