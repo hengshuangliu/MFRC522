@@ -470,5 +470,3 @@ void RFID_halt()
  
   status = MFRC522ToCard(PCD_TRANSCEIVE, buff, 4, buff,&unLen);
 }
-
-}
